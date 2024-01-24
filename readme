@@ -1,0 +1,40 @@
+// app.get("/", (req, res) => {
+//   // Sample MySQL query
+//   connection.query("SELECT * From users", (err, results) => {
+//     if (err) {
+//       console.error("Error executing MySQL query:", err);
+//       res.status(500).send("Internal Server Error");
+//       return;
+//     }
+//     res.json(results);
+//   });
+// });
+
+
+// before intergation to fornt end 
+
+app.post("/signup", (req, resp) => {
+    const data = req.body;
+    connection.query("INSERT INTO users SET ?", data, (err, result, fields) => {
+      if (err) console.error("Error executing MySQL query:", err);
+      resp.send(result);
+    });
+  });
+//   after 
+app.post('/api/signup', (req, res) => {
+    const { name, email, taxId, phoneNumber, companyName, password } = req.body;
+  
+    const query = `
+      INSERT INTO users (name, email, tax_id, phone_number, company_name, password)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `;
+  
+    connection.query(query, [name, email, taxId, phoneNumber, companyName, password], (error, results) => {
+      if (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal Server Error' });
+      } else {
+        res.status(200).json({ message: 'User registered successfully' });
+      }
+    });
+  });
