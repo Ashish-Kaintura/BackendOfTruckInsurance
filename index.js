@@ -5,8 +5,40 @@ const { createUser, getUserByEmail } = require("./userController");
 const cors = require("cors");
 const multer = require("multer");
 const nodemailer = require("nodemailer");
-
+const jwt = require("jsonwebtoken");
+const jwtKey = "j&Struck";
 const app = express();
+// const verifyToken = (req, resp, next) => {
+//   const token = req.headers.authorization;
+//   if (!token) {
+//     return resp.status(403).json({ error: "Token is required" });
+//   }
+
+//   jwt.verify(token, jwtKey, (err, decoded) => {
+//     if (err) {
+//       return resp.status(401).json({ error: "Unauthorized" });
+//     }
+//     req.user = decoded;
+//     next();
+//   });
+// };
+
+const verifyToken = (req, resp, next) => {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+
+  if (!token) {
+    return resp.status(401).json({ error: "Token not provided" });
+  }
+
+  jwt.verify(token, jwtKey, (err, decoded) => {
+    if (err) {
+      return resp.status(403).json({ error: "Failed to authenticate token" });
+    }
+    req.user = decoded;
+    next();
+  });
+};
 app.use(cors());
 app.use(express.json());
 
@@ -38,10 +70,7 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage: storage });
-const users = [
-  { username: "J&SInsurance", password: "123456" },
-  // { username: "user2", password: "password2" },
-];
+const users = [{ username: "J&SInsurance", password: "123456" }];
 // master login
 app.post("/masterlogin", (req, res) => {
   const { username, password } = req.body;
@@ -52,14 +81,18 @@ app.post("/masterlogin", (req, res) => {
   );
 
   if (user) {
-    // Send user data as response
-    res.status(200).json({ username: user.username });
+    const token = jwt.sign({ username: user.username }, jwtKey);
+    console.log(`User ${username} logged in`);
+    res.status(200).json({ user, isAdmin: token });
   } else {
     res.status(401).json({ message: "Invalid username or password" });
   }
 });
+app.get("/masterusers", verifyToken, (req, res) => {
+  res.status(200).json(users); // Assuming `users` is your array of users
+});
 // get id
-app.get("/users", (req, resp) => {
+app.get("/users", verifyToken, (req, resp) => {
   connection.query("SELECT * FROM users", (err, results) => {
     if (err) {
       console.error("Error executing MySQL query:", err);
@@ -70,7 +103,7 @@ app.get("/users", (req, resp) => {
   });
 });
 
-app.get("/users/:id", (req, res) => {
+app.get("/users/:id", verifyToken, (req, res) => {
   const userId = req.params.id;
   connection.query(
     "SELECT * FROM users WHERE id = ?",
@@ -115,7 +148,10 @@ app.post("/signup", async (req, resp) => {
       address
     );
 
-    return resp.json(userData);
+    // Generate JWT token
+    const token = jwt.sign({ email: userData.email }, jwtKey);
+    return resp.json({ userData, auth: token });
+    // return resp.json(userData);
   } catch (error) {
     console.error("Error during signup:", error);
     return resp.status(500).send("Error during signup");
@@ -134,12 +170,14 @@ app.post("/login", async (req, resp) => {
     if (!user || user.password !== password) {
       return resp.status(401).json({ error: "Invalid credentials" });
     }
-
+    // Generate JWT token
+    const token = jwt.sign({ email: user.email }, jwtKey);
     // Log successful login
     console.log(`User ${email} logged in`);
 
     // return resp.json({ message: "Login successful", user });
-    return resp.json(user);
+    return resp.json({ user, auth: token });
+    // return resp.json(user);
   } catch (error) {
     console.error("Error during login:", error);
     return resp.status(500).json({ error: "Error during login" });
@@ -169,31 +207,29 @@ app.delete("/users/:id", (req, res) => {
     }
   );
 });
-// delte insurace 
-// app.delete("/users_insurance_certificate/:id", (req, res) => {
-//   const userId = req.params.id;
 
-//   connection.query(
-//     "UPDATE users SET insurance_certificate = NULL WHERE id = ?",
-//     [userId],
-//     (err, results) => {
-//       if (err) {
-//         console.error("Error executing MySQL query:", err);
-//         res.status(500).send("Internal Server Error");
-//         return;
-//       }
+// Route to handle DELETE requests to delete insurance_certificate by user ID
+app.delete("/users/:id/insurance_certificate", (req, res) => {
+  const userId = req.params.id;
+  console.log("userId:", userId); // Add this line to check the value of userId
 
-//       if (results.affectedRows === 0) {
-//         // No user found with the specified ID
-//         res.status(404).send("User not found");
-//         return;
-//       }
+  // Using parameterized query to prevent SQL injection
+  const sql = `UPDATE users SET insurance_certificate = NULL WHERE id = ?`;
 
-//       res.status(204).send("Insurance certificate value deleted successfully"); // Successfully deleted, return 204 No Content
-//     }
-//   );
-// });
+  // Execute the query with the user ID as a parameter
+  connection.query(sql, [userId], (err, result) => {
+    if (err) {
+      console.error("Error deleting insurance certificate:", err);
+      res.status(500).json({ error: "Internal server error" });
+      return;
+    }
 
+    console.log(`Insurance certificate deleted for user with ID ${userId}`);
+    res.status(200).json({
+      message: `Insurance certificate deleted for user with ID ${userId}`,
+    });
+  });
+});
 
 // for update
 app.put("/users/:id", upload.single("profileImg"), (req, resp) => {
@@ -364,7 +400,7 @@ app.put("/clintUpdate/:id", upload.single("profileImg"), (req, resp) => {
   );
 });
 // Search API
-app.get("/search", async (req, res) => {
+app.get("/search", verifyToken, async (req, res) => {
   const searchTerm = req.query.q; // Get the search term from the query parameters
 
   try {
@@ -434,7 +470,7 @@ function removeDuplicates(array) {
   return uniqueArray;
 }
 // Define your GET API endpoint
-app.get("/getemails", (req, res) => {
+app.get("/getemails", verifyToken, (req, res) => {
   // Here you would retrieve emails from your database
   // Assuming you have a connection object named 'connection'
   connection.query("SELECT * FROM emails", (err, results) => {
@@ -497,6 +533,7 @@ app.post("/sendemail", emailUpload.single("attachment"), (req, res) => {
     }
   });
 });
+
 
 // app.post("/signup", (req, resp) => {
 //   const sql =
