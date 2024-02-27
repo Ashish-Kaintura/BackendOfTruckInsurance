@@ -7,6 +7,8 @@ const multer = require("multer");
 const nodemailer = require("nodemailer");
 const jwt = require("jsonwebtoken");
 const jwtKey = "j&Struck";
+require('dotenv').config();
+
 const port = process.env.PORT || 5000
 const app = express();
 
