@@ -7,21 +7,8 @@ const multer = require("multer");
 const nodemailer = require("nodemailer");
 const jwt = require("jsonwebtoken");
 const jwtKey = "j&Struck";
+const port = process.env.PORT || 5000
 const app = express();
-// const verifyToken = (req, resp, next) => {
-//   const token = req.headers.authorization;
-//   if (!token) {
-//     return resp.status(403).json({ error: "Token is required" });
-//   }
-
-//   jwt.verify(token, jwtKey, (err, decoded) => {
-//     if (err) {
-//       return resp.status(401).json({ error: "Unauthorized" });
-//     }
-//     req.user = decoded;
-//     next();
-//   });
-// };
 
 const verifyToken = (req, resp, next) => {
   const authHeader = req.headers["authorization"];
@@ -92,7 +79,7 @@ app.get("/masterusers", verifyToken, (req, res) => {
   res.status(200).json(users); // Assuming `users` is your array of users
 });
 // get id
-app.get("/users", verifyToken, (req, resp) => {
+app.get("/users",  (req, resp) => {
   connection.query("SELECT * FROM users", (err, results) => {
     if (err) {
       console.error("Error executing MySQL query:", err);
@@ -354,24 +341,15 @@ app.put(
 );
 
 // upate form client side
-app.put("/clintUpdate/:id", upload.single("profileImg"), (req, resp) => {
+app.put("/clintUpdate/:id", (req, resp) => {
   const userId = req.params.id;
-  // console.log("Received PUT request for user ID:", userId);
-  // console.log("File received:", req.file);
+
   const { username, company_name, address } = req.body;
 
-  // Get the original filename of the uploaded image
-  const originalFilename = req.file ? req.file.originalname : null;
-
-  // If new image is provided, update profileImg in the database
-  // Otherwise, keep the existing image filename
-  const profileImg = req.file ? originalFilename : req.body.profileImg;
   const data = [
     username,
     company_name,
     address,
-    profileImg,
-    // Store the original filename in the database
     userId,
   ];
 
@@ -379,7 +357,7 @@ app.put("/clintUpdate/:id", upload.single("profileImg"), (req, resp) => {
   console.log("File received:", req.file);
 
   connection.query(
-    "UPDATE users SET username = ?, company_name = ?, address = ?,  profileImg = ?  WHERE id = ?",
+    "UPDATE users SET username = ?, company_name = ?, address = ?  WHERE id = ?",
     data,
     (err, result) => {
       if (err) {
@@ -654,6 +632,6 @@ app.post("/sendemail", emailUpload.single("attachment"), (req, res) => {
 //   );
 // });
 
-app.listen(5000, () => {
-  console.log("Server is running on port localhost:5000");
+app.listen(port, () => {
+  console.log(`example app listining at http:localhost:${port}`);
 });
