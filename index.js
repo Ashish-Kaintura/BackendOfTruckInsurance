@@ -79,7 +79,7 @@ app.get("/masterusers", verifyToken, (req, res) => {
   res.status(200).json(users); // Assuming `users` is your array of users
 });
 // get id
-app.get("/users",  (req, resp) => {
+app.get("/users", verifyToken, (req, resp) => {
   connection.query("SELECT * FROM users", (err, results) => {
     if (err) {
       console.error("Error executing MySQL query:", err);
